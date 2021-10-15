@@ -1,0 +1,14 @@
+python3 train.py `
+    --arch resnet34 `
+    --device cuda `
+    --batch_size 2 `
+    --max_epoch 2 `
+    --lr 0.001 `
+    --num_worker 0 `
+    --model_save_dir server/checkpoints `
+    --model_save_name resnet34-avMixup `
+    --data ~/datasets/custom `
+    --logdir server/runs `
+    --adversarial_training `
+    --attack_method pgd `
+    --attack_args epsilon=2 alpha=2 num_steps=10
