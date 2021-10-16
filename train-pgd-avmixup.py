@@ -1,3 +1,4 @@
+# scp ./Adversarial-Training/train-pgd-avmixup.py zhr@192.168.1.161:~/project/at 
 import torch
 import torch.nn as nn
 from torchvision import transforms, datasets
@@ -88,7 +89,7 @@ def cross_entropy(input_, target, reduction='elementwise_mean'):
 
 matplotlib.use('Agg')
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 print(device)
 
 data_transform = {
@@ -156,7 +157,7 @@ n = 2  #训练次数
 
 is_mixup = True
 
-for epoch in range(200):
+for epoch in range(30):
     # train
     time_start=time.time()
 
@@ -167,6 +168,8 @@ for epoch in range(200):
 
     net.train()
     running_loss = 0.0
+    running_acc=0.0
+    acc = 0.0  # accumulate accurate number / epoch
     for step, data in enumerate(train_loader, start=0):
         images, labels = data
         optimizer.zero_grad()
@@ -187,18 +190,22 @@ for epoch in range(200):
         else:
             logits = net(adv_images.to(device))
             loss = loss_function(logits, labels.to(device))
+        predict_y = torch.max(logits, dim=1)[1]
+        acc += (predict_y == labels.to(device)).sum().item()
 
         loss.backward()
         optimizer.step()
 
         # print statistics
         running_loss += loss.item()
+        running_acc += acc
         # print train process
         rate = (step+1)/len(train_loader)
         a = "*" * int(rate * 50)
         b = "." * int((1 - rate) * 50)
         print("\rtrain loss: {:^3.0f}%[{}->{}]{:.4f}".format(int(rate*100), a, b, loss), end="")
     time_end=time.time()
+    train_accurate = running_acc / val_num
     print('    time cost:%.2f'%(time_end-time_start))
     print()
 
@@ -219,8 +226,7 @@ for epoch in range(200):
             best_acc = val_accurate
             best_epoch = epoch
             torch.save(net.state_dict(), "./saver/" + str(n) +"_240epoch_" + save_path + '.pth')
-        print('[epoch %d] train_loss: %.3f  test_accuracy: %.4f' %
-              (epoch + 1, running_loss / step, val_accurate))
+        print('[epoch %d] train_loss: %.3f train_acc: %.4f test_accuracy: %.4f' %(epoch + 1,running_acc/step, running_loss / step, val_accurate))
         Loss_list.append(running_loss / step)
         Accuracy_list.append(100 * val_accurate)
     # if epoch == 100:
@@ -260,6 +266,7 @@ plt.plot(x2, y2)
 plt.xlabel("Train_set loss vs. epoches")
 plt.ylabel("Train_set loss")
 
+os.makedirs('saver')
 plt.savefig("./saver/" +str(n) + '_240epoch_' + save_path + '.jpg')  ##################
 #plt.show()
 print('Finished Training')

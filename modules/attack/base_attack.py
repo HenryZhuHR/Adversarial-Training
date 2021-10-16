@@ -33,7 +33,10 @@ class BaseAttack(metaclass=ABCMeta):
         all_params_dict = dict()
         for param_str in all_params:
             param, value = param_str.split('=')
-            all_params_dict[param] = float(value)
+            if '/' in value:
+                all_params_dict[param] = float(value.split('/')[0])/float(value.split('/')[1])
+            else:
+                all_params_dict[param] = float(value)
 
         print('-'*33)
         # filter param by self.ATTACK_PARAMETERS

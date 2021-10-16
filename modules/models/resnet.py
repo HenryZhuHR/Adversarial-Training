@@ -8,7 +8,7 @@ from torchvision.models.resnet import (
 )
 
 
-class Resnet34(nn.Module):
+class Resnet34_torch(nn.Module):
     def __init__(self, channel: int = 3, pretrained=True):
         super(Resnet34, self).__init__()
         self.backbone = resnet34(pretrained=pretrained)
@@ -59,3 +59,4 @@ class Resnet50(nn.Module):
         x = self.fc(x)
 
         return x
+

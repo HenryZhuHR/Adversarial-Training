@@ -1,20 +1,15 @@
 import os
 from torch import nn
 
-from .cnn import (
-    MNIST_CNN,
-)
 
 
 # === ResNetX with non-local adding in different stage ===
-from .resnet import (
-    Resnet34,
-    Resnet50,
+from .resnet34 import (
+    ResNet34,
 )
 
 model_zoo = {
-    'resnet34': Resnet34,
-    'resnet50': Resnet50,
+    'resnet34': ResNet34,
 }
 
 

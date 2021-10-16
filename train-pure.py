@@ -1,8 +1,8 @@
-
-from ctypes import DEFAULT_MODE
 import os
 import copy
+from torchvision.models.resnet import resnet34
 import tqdm
+import json
 import argparse
 import numpy as np
 import torch
@@ -18,66 +18,72 @@ from torch.utils.tensorboard import SummaryWriter
 
 from modules import attack
 from modules import models as Models
+
 # --------------------------------------------------------
 #   Args
 # --------------------------------------------------------
-parser = argparse.ArgumentParser(description='Adversarial Training')
-
-# train parameter
+parser = argparse.ArgumentParser(description='train model')
+# base train argument
 parser.add_argument('--arch', type=str, choices=Models.model_zoo,
-                    default=list(Models.model_zoo.keys())[0],
-                    # default='resnet50',
-                    )
-parser.add_argument('--device', type=str, default='cuda:0')
-parser.add_argument('--batch_size', type=int, default=32)
+                    default=list(Models.model_zoo.keys())[0])
+parser.add_argument('--device', type=str, default='cpu')
+parser.add_argument('--batch_size', type=int, default=2)
+parser.add_argument('--num_worker', type=int, default=0)
 parser.add_argument('--max_epoch', type=int, default=100)
 parser.add_argument('--lr', type=float, default=0.01)
-parser.add_argument('--seed', type=int, default=np.random.randint(100000))
-parser.add_argument('--num_worker', type=int, default=8)
-parser.add_argument('--model_save_dir', type=str, default='server/checkpoints')
-parser.add_argument('--model_save_name', type=str,
-                    help='using arch name if not given')
+parser.add_argument('--seed', type=int,
+                    help='random seed set')
 parser.add_argument('--data', type=str, default='%s/datasets/custom' % os.path.expanduser('~'),
                     help='dataset folder')
-parser.add_argument('--logdir', type=str, default='server/runs',
+# model save argument
+parser.add_argument('--model_save_dir', type=str, default='server/checkpoints')
+parser.add_argument('--model_save_name', type=str, default='default_model',
+                    help='using arch name if not given')
+parser.add_argument('--logdir', type=str, default='server',
                     help='train log save folder')
 parser.add_argument('--model_summary', action='store_true',
                     help='if print model summary')
-# adversarial training
-parser.add_argument('--adversarial_training', action='store_true',
-                    help='if adversarial training')
-parser.add_argument('--gamma', default=2.0, type=float)
-parser.add_argument('--lambda1', default=0.5, type=float)
-parser.add_argument('--lambda2', default=0.7, type=float)
-parser.add_argument('--attack_method', type=str, default='fgsm')
-parser.add_argument('--attack_args', nargs=argparse.REMAINDER)
 args = parser.parse_args()
 
 # Parse Args
-ARCH: int = args.arch
+ARCH: str = args.arch
 DEVICE: str = args.device
-BATCH_SIZE: int = args.batch_size    # 128
+BATCH_SIZE: int = args.batch_size    # 2
+NUM_WORKERS: int = args.num_worker   # 0
 MAX_EPOCH: int = args.max_epoch    # 100
 LR: float = args.lr   # 0.01
-NUM_WORKERS: int = args.num_worker   # 8
+SEED: int = args.seed
+DATASET_DIR: str = args.data  # 'data'
+
 MODEL_SAVE_DIR: str = args.model_save_dir  # 'checkpoints'
 MODEL_SAVE_NAME: str = ARCH if args.model_save_name == None else args.model_save_name  # 'NONE'/ARCH
-DATASET_DIR: str = args.data  # 'data'
 LOG_DIR: str = args.logdir    # 'where tensorboard data save (runs)'
 IS_MODEL_SUMMARY: bool = args.model_summary
-# adversarial training
-IS_ADVERSARIAL_TRAINING: bool = args.adversarial_training
-ATTACK_METHOD: str = args.attack_method
-ATTACK_PARAMS: list = None if ATTACK_METHOD == None else args.attack_args
 
-DATA_TRANSFORM = {
-    'train': transforms.Compose([transforms.Resize(224),
-                                 transforms.ToTensor()]),
-    'valid': transforms.Compose([transforms.Resize(224),
-                                transforms.ToTensor()]),
-    'test': transforms.Compose([transforms.Resize(224),
-                                transforms.ToTensor()])
-}
+
+def pgd_attack(model, images, labels, device='cpu', eps=4/255, alpha=0.01, iters=7):
+    images = images.to(device)
+    labels = labels.to(device)
+    loss = nn.CrossEntropyLoss()
+
+    ori_images = images.data
+
+    for i in range(iters):
+        images.requires_grad = True
+        outputs = model(images)
+
+        model.zero_grad()
+        cost = loss(outputs, labels).to(device)
+        cost.backward()
+
+        adv_images = images + alpha*images.grad.sign()
+        eta = torch.clamp(adv_images - ori_images, min=-eps, max=eps)
+        images = torch.clamp(ori_images + eta, min=0, max=1).detach_()
+
+    eta = torch.clamp(adv_images - ori_images, min=-eps, max=eps)
+    images = torch.clamp(ori_images + 2 * eta, min=0, max=1).detach_()
+
+    return images
 
 
 def smooth_one_hot(true_labels: torch.Tensor, classes: int, smoothing=0.0):
@@ -87,13 +93,17 @@ def smooth_one_hot(true_labels: torch.Tensor, classes: int, smoothing=0.0):
     """
     assert 0 <= smoothing < 1
     confidence = 1.0 - smoothing
-    label_shape = torch.Size((true_labels.size(0), classes))    # torch.Size([2, 5])
+    label_shape = torch.Size(
+        (true_labels.size(0), classes))    # torch.Size([2, 5])
     with torch.no_grad():
-        true_dist = torch.empty(size=label_shape, device=true_labels.device)    # 空的，没有初始化
+        true_dist = torch.empty(
+            size=label_shape, device=true_labels.device)    # 空的，没有初始化
         true_dist.fill_(smoothing / (classes - 1))
         _, index = torch.max(true_labels, 1)
-        true_dist.scatter_(1, torch.LongTensor(index.unsqueeze(1)), confidence)     # 必须要torch.LongTensor()
+        true_dist.scatter_(1, torch.LongTensor(
+            index.unsqueeze(1)), confidence)     # 必须要torch.LongTensor()
     return true_dist
+
 
 def one_hot(x, class_count=10):
     # 第一构造一个[class_count, class_count]的对角线为1的向量
@@ -129,49 +139,60 @@ def cross_entropy(input_, target, reduction='elementwise_mean'):
 
 
 if __name__ == '__main__':
+
+    # create train log save folder
     os.makedirs('%s/%s' % (LOG_DIR, ARCH), exist_ok=True)
 
+    # init Tensorborad SummaryWriter
     writer = SummaryWriter('%s/%s' % (LOG_DIR, ARCH))
 
     # ----------------------------------------
     #   Load dataset
     # ----------------------------------------
-    if ARCH == 'mnist_cnn':  # https://pytorch.org/vision/stable/datasets.html#mnist
-        train_set = torchvision.datasets.MNIST(root=os.path.join(os.path.expanduser('~'), 'datasets'),
-                                               train=True, download=True, transform=transforms.ToTensor())
-        valid_set = torchvision.datasets.MNIST(root=os.path.join(os.path.expanduser('~'), 'datasets'),
-                                               train=False, download=True, transform=transforms.ToTensor())
-        test_set = torchvision.datasets.MNIST(root=os.path.join(os.path.expanduser('~'), 'datasets'),
-                                              train=False, download=True, transform=transforms.ToTensor())
-    else:
-        train_set = datasets.ImageFolder(os.path.join(DATASET_DIR, 'train'),
-                                         transform=DATA_TRANSFORM['train'])
-        valid_set = datasets.ImageFolder(os.path.join(DATASET_DIR, 'valid'),
-                                         transform=DATA_TRANSFORM['valid'])
-        test_set = datasets.ImageFolder(os.path.join(DATASET_DIR, 'test'),
-                                        transform=DATA_TRANSFORM['test'])
-
-    valid_loader = data.DataLoader(valid_set, batch_size=BATCH_SIZE,
-                                   shuffle=False, num_workers=NUM_WORKERS)
-    test_loader = data.DataLoader(test_set, batch_size=1,
-                                  shuffle=False, num_workers=NUM_WORKERS)
+    DATA_TRANSFORM = {
+        'train': transforms.Compose([transforms.Resize(224),
+                                     transforms.ToTensor()]),
+        'valid': transforms.Compose([transforms.Resize(256), transforms.CenterCrop(224),
+                                     transforms.ToTensor()]),
+        'test': transforms.Compose([transforms.Resize(224),
+                                    transforms.ToTensor()])
+    }
+    train_set = datasets.ImageFolder(os.path.join(DATASET_DIR, 'train'),
+                                     transform=DATA_TRANSFORM['train'])
+    valid_set = datasets.ImageFolder(os.path.join(DATASET_DIR, 'valid'),
+                                     transform=DATA_TRANSFORM['valid'])
+    test_set = datasets.ImageFolder(os.path.join(DATASET_DIR, 'test'),
+                                    transform=DATA_TRANSFORM['test'])
     train_loader = data.DataLoader(train_set, batch_size=BATCH_SIZE,
                                    shuffle=True, num_workers=NUM_WORKERS)
-
+    valid_loader = data.DataLoader(valid_set, batch_size=BATCH_SIZE,
+                                   shuffle=False, num_workers=NUM_WORKERS)
+    test_loader = data.DataLoader(test_set, batch_size=BATCH_SIZE,
+                                  shuffle=False, num_workers=NUM_WORKERS)
     num_class = len(train_set.classes)
+    print('%s Load \033[0;32;40m%d\033[0m classes dataset' %
+          (chr(128229), num_class))
+
+    # save class json file in log_dir
+    with open(os.path.join(LOG_DIR, 'class_indices.json'), 'w') as f:
+        f.write(json.dumps(
+            {(value, key) for key, value in train_set.class_to_idx.items()},
+            indent=4
+        ))
+
     # ----------------------------------------
     #   Load model and fine tune
     # ----------------------------------------
-    print('Try to load model \033[0;32;40m%s\033[0m ...' % ARCH)
+    print('%s Try to load model \033[0;32;40m%s\033[0m ...' % (
+        chr(128229), ARCH))
     model: nn.Module = Models.model_zoo[ARCH]()
     model.fc = nn.Linear(model.fc.in_features, num_class)
-
     model.to(DEVICE)
 
-    if IS_ADVERSARIAL_TRAINING:
-        model_attack: attack.BaseAttack = attack.GetAttackByName(
-            ATTACK_METHOD)(model, DEVICE, ATTACK_PARAMS)
-
+    loss_function = nn.CrossEntropyLoss()
+    # loss_function = nn.MSELoss()
+    loss_function.to(DEVICE)
+    optimizer = optim.Adam(model.parameters(), lr=LR)
 
     # ----------------------------------------
     #   tensorboard :   Add model graph
@@ -189,14 +210,19 @@ if __name__ == '__main__':
             print(summary(model, input_tensor_sample.size(),
                   device=DEVICE.split(':')[0]))
 
-    loss_function = nn.CrossEntropyLoss()
-    loss_function.to(DEVICE)
-    optimizer = optim.Adam(model.parameters(), lr=LR)
+    # ----------------------------------------
+    #   set train random seed
+    # ----------------------------------------
+    if SEED is not None:
+        torch.manual_seed(SEED)  # set seed for current CPU
+        torch.cuda.manual_seed(SEED)  # set seed for current GPU
+        torch.cuda.manual_seed_all(SEED)  # set seed for all GPU
 
     # ----------------------------------------
     #   Train model
     # ----------------------------------------
-    print('train model in device: \033[0;32;40m%s\033[0m ' % DEVICE)
+    print('%s Train model in device: \033[0;32;40m%s\033[0m ' % (
+        chr(128640), DEVICE))
     os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
     train_log = []
     best_model_state_dict = copy.deepcopy(model.state_dict())
@@ -212,34 +238,16 @@ if __name__ == '__main__':
         num_data = 0    # how many data has trained
         model.train()
         pbar = tqdm.tqdm(train_loader)
+        # mini batch
         for images, labels in pbar:
             images: Tensor = images.to(DEVICE)
             labels: Tensor = labels.to(DEVICE)
             batch = images.size(0)
             num_data += batch
 
-            images = model_attack.attack(images, labels)
-
-            # Mixup
-            is_mixup = True
-            if is_mixup:
-                alpha_ = 9999.0
-                lam = np.random.beta(alpha_, alpha_)
-                
-                index = torch.randperm(images.size(0)).cuda()
-                inputs: Tensor = lam*images.cuda() + (1-lam)*images[index, :].cuda()
-                labels_a, labels_b = labels, labels[index]
-                labels_a: Tensor = one_hot(labels_a, 10)
-                labels_b: Tensor = one_hot(labels_b, 10)
-
-                output = model(inputs.to(DEVICE))
-                _, pred = torch.max(output, 1)
-                loss = lam * cross_entropy(output, smooth_one_hot(labels_a, 10, 0.3).to(DEVICE))+(
-                    1 - lam) * cross_entropy(output, smooth_one_hot(labels_b, 10, 0.3).to(DEVICE))
-            else:
-                output: Tensor = model(images)
-                _, pred = torch.max(output, 1)
-                loss: Tensor = loss_function(output, labels)
+            output: Tensor = model(images)
+            _, pred = torch.max(output, 1)
+            loss: Tensor = loss_function(output, labels)
 
             loss.backward()
             optimizer.step()
@@ -250,8 +258,9 @@ if __name__ == '__main__':
             running_loss += epoch_loss
             running__acc += epoch__acc
 
-            pbar.set_description('loss:%.6f acc:%.6f lam:%.6f' %
-                                 (epoch_loss / batch, epoch__acc / batch,lam))
+            pbar.set_description('loss:%.6f acc:%.6f' %
+                                 (epoch_loss / batch, epoch__acc / batch))
+
         train_loss = running_loss / num_data
         train_acc = running__acc / num_data
 
@@ -276,12 +285,14 @@ if __name__ == '__main__':
                 running_loss += epoch_loss
                 running__acc += epoch__acc
 
-                pbar.set_description('loss:%.6f acc:%.6f' %
-                                     (epoch_loss / batch, epoch__acc / batch))
+                pbar.set_description('loss:%.6f acc:%.6f' % (
+                    epoch_loss / batch, epoch__acc / batch))
+                # pbar.set_description('acc:%.6f' % (epoch__acc / batch))
             valid_loss = running_loss / num_data
             valid_acc = running__acc / num_data
 
         print('Train Loss:%f Accuracy:%f' % (train_loss, train_acc))
+        # print('Valid Accuracy:%f' % (valid_acc))
         print('Valid Loss:%f Accuracy:%f' % (valid_loss, valid_acc))
 
         writer.add_scalar('Train/Loss', train_loss, global_step=epoch)
@@ -295,7 +306,11 @@ if __name__ == '__main__':
         torch.save(model.state_dict(), os.path.join(
             MODEL_SAVE_DIR, '%s.pt' % ARCH))
 
-        train_log.append([epoch, train_loss, train_acc, valid_loss, valid_acc])
+        train_log.append([
+            epoch,
+            train_loss, train_acc,
+            valid_loss, valid_acc
+        ])
 
     # save the best model
     model.load_state_dict(best_model_state_dict)
@@ -338,7 +353,8 @@ if __name__ == '__main__':
     hparam_dict = {'batch size': BATCH_SIZE, 'lr': LR}
     metric_dict = {
         'train loss': train_loss, 'train accuracy': train_acc,
-        'valid loss': valid_loss, 'valid accuracy': valid_acc,
+        'valid loss': valid_loss,
+        'valid accuracy': valid_acc,
         'test accuracy': test_acc
     }
     writer.add_hparams(hparam_dict, metric_dict)
@@ -355,6 +371,6 @@ if __name__ == '__main__':
         f.write('test_loss:%f,test_acc:%f\n' % (test_loss, test_acc))
         f.write('epoch\ttrain loss\ttrain accuracy\tvalid loss\tvalid accuracy\n')
         for item in train_log:
-            f.write('{epoch:.6f}\t{train_loss:.6f}\t{train_acc:.6f}\t{valid_loss:.6f}\t{valid_acc:.6f}\n'.format(
-                epoch=epoch, train_loss=train_loss, train_acc=train_acc, valid_loss=valid_loss, valid_acc=valid_acc
+            f.write('{epoch:.6f}\t{train_loss:.6f}\t{train_acc:.6f}\t{valid_acc:.6f}\n'.format(
+                epoch=epoch, train_loss=train_loss, train_acc=train_acc,  valid_acc=valid_acc
             ))
