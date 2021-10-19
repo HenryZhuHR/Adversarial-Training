@@ -30,15 +30,16 @@ class BaseAttack(metaclass=ABCMeta):
         ===
         parse and filter parameters according to attack method
         """
+        # parse all param
         all_params_dict = dict()
         for param_str in all_params:
             param, value = param_str.split('=')
-            if '/' in value:
+            if '/' in value: # input type: 4/255
                 all_params_dict[param] = float(value.split('/')[0])/float(value.split('/')[1])
-            else:
+            else:# input type: 0.01
                 all_params_dict[param] = float(value)
 
-        print('-'*33)
+        print('-'*36)
         # filter param by self.ATTACK_PARAMETERS
         valid_flag = chr(128640)
         print('Get parameters(%s means valid attack parameter) :' % valid_flag)

@@ -5,7 +5,6 @@ from torch import nn
 from torch import optim
 from torch import Tensor
 
-from train import ATTACK_METHOD
 from .base_attack import BaseAttack
 
 class PGD(BaseAttack):

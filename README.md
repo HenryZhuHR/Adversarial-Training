@@ -1,6 +1,11 @@
 # Adversarial-Training
 
 
+# Connection
+```bash
+ssh zhr@192.168.1.161 -A
+```
+
 # TB
 ```bash
 tensorboard --logdir . --host 192.168.1.161

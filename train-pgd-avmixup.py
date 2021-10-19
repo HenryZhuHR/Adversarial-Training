@@ -114,7 +114,7 @@ json_str = json.dumps(cla_dict, indent=4)
 with open('class_indices.json', 'w') as json_file:
     json_file.write(json_str)
 
-batch_size = 128 ##################
+batch_size = 256 ##################
 train_loader = torch.utils.data.DataLoader(train_dataset,
                                            batch_size=batch_size, shuffle=True,
                                            num_workers=8)
@@ -155,7 +155,7 @@ save_path = 'PGD-7AVmixup_resNet34_ls0.5_0.5' ################## 模型保存路
 print(save_path)
 n = 2  #训练次数
 
-is_mixup = True
+is_mixup = False
 
 for epoch in range(30):
     # train
@@ -191,7 +191,8 @@ for epoch in range(30):
             logits = net(adv_images.to(device))
             loss = loss_function(logits, labels.to(device))
         predict_y = torch.max(logits, dim=1)[1]
-        acc += (predict_y == labels.to(device)).sum().item()
+        e_acc=(predict_y == labels.to(device)).sum().item()
+        acc += e_acc
 
         loss.backward()
         optimizer.step()
@@ -203,9 +204,9 @@ for epoch in range(30):
         rate = (step+1)/len(train_loader)
         a = "*" * int(rate * 50)
         b = "." * int((1 - rate) * 50)
-        print("\rtrain loss: {:^3.0f}%[{}->{}]{:.4f}".format(int(rate*100), a, b, loss), end="")
+        print("\rtrain loss: {:^3.0f}%[{}->{}]{:.4f}  acc:{:.4f}".format(int(rate*100), a, b, loss,e_acc/images.size(0)), end="")
     time_end=time.time()
-    train_accurate = running_acc / val_num
+    train_accurate = running_acc / train_num
     print('    time cost:%.2f'%(time_end-time_start))
     print()
 
@@ -226,7 +227,7 @@ for epoch in range(30):
             best_acc = val_accurate
             best_epoch = epoch
             torch.save(net.state_dict(), "./saver/" + str(n) +"_240epoch_" + save_path + '.pth')
-        print('[epoch %d] train_loss: %.3f train_acc: %.4f test_accuracy: %.4f' %(epoch + 1,running_acc/step, running_loss / step, val_accurate))
+        print('[epoch %d] train_loss: %.3f train_acc: %.4f test_accuracy: %.4f' %(epoch + 1, running_loss / step,running_acc/train_num, val_accurate))
         Loss_list.append(running_loss / step)
         Accuracy_list.append(100 * val_accurate)
     # if epoch == 100:

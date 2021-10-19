@@ -1,6 +1,6 @@
 import os
 import copy
-from torchvision.models.resnet import resnet34
+import time
 import tqdm
 import json
 import argparse
@@ -16,44 +16,38 @@ from torchvision import datasets
 from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
 
-from modules import attack
+# from modules import attack
 from modules import models as Models
-
 
 # --------------------------------------------------------
 #   Args
 # --------------------------------------------------------
-
-parser = argparse.ArgumentParser(description='Adversarial Training')
-
-
+parser = argparse.ArgumentParser(description='train model')
+# base train argument
 parser.add_argument('--arch', type=str, choices=Models.model_zoo,
-                    default=list(Models.model_zoo.keys())[0],
-                    # default='resnet50',
-                    )
-parser.add_argument('--device', type=str, default='cuda:0')
+                    default=list(Models.model_zoo.keys())[0])
+parser.add_argument('--device', type=str, default='cpu')
 parser.add_argument('--batch_size', type=int, default=2)
 parser.add_argument('--num_worker', type=int, default=0)
 parser.add_argument('--max_epoch', type=int, default=100)
 parser.add_argument('--lr', type=float, default=0.01)
-parser.add_argument('--seed', type=int)
+parser.add_argument('--seed', type=int,
+                    help='random seed set')
 parser.add_argument('--data', type=str, default='%s/datasets/custom' % os.path.expanduser('~'),
                     help='dataset folder')
+# model save argument
 parser.add_argument('--model_save_dir', type=str, default='server/checkpoints')
-parser.add_argument('--model_save_name', type=str,
+parser.add_argument('--model_save_name', type=str, default='default_model',
                     help='using arch name if not given')
-
 parser.add_argument('--logdir', type=str, default='server',
                     help='train log save folder')
 parser.add_argument('--model_summary', action='store_true',
                     help='if print model summary')
-# adversarial training
-parser.add_argument('--adversarial_training', action='store_true',
-                    help='if adversarial training')
-parser.add_argument('--attack_method', type=str, default='pgd')
-parser.add_argument('--attack_args', nargs=argparse.REMAINDER)
-args = parser.parse_args()
 
+parser.add_argument('--epsilon', type=float)
+parser.add_argument('--alpha', type=float)
+parser.add_argument('--iters', type=int)
+args = parser.parse_args()
 
 # Parse Args
 ARCH: str = args.arch
@@ -64,27 +58,21 @@ MAX_EPOCH: int = args.max_epoch    # 100
 LR: float = args.lr   # 0.01
 SEED: int = args.seed
 DATASET_DIR: str = args.data  # 'data'
+
 MODEL_SAVE_DIR: str = args.model_save_dir  # 'checkpoints'
 MODEL_SAVE_NAME: str = ARCH if args.model_save_name == None else args.model_save_name  # 'NONE'/ARCH
-
 LOG_DIR: str = args.logdir    # 'where tensorboard data save (runs)'
 IS_MODEL_SUMMARY: bool = args.model_summary
 
-# adversarial training
-IS_ADVERSARIAL_TRAINING: bool = args.adversarial_training
-ATTACK_METHOD: str = args.attack_method
-ATTACK_PARAMS: list = None if ATTACK_METHOD == None else args.attack_args
-
-
-DATA_TRANSFORM = {
-    'train': transforms.Compose([transforms.Resize(224),
-                                 transforms.ToTensor()]),
-    'valid': transforms.Compose([transforms.Resize(256), transforms.CenterCrop(224),
-                                transforms.ToTensor()]),
-    'test': transforms.Compose([transforms.Resize(224),
-                                transforms.ToTensor()])
-}
-
+EPSILON: float = args.epsilon/255
+ALPHA: float = args.alpha
+ITERS: float = args.iters
+print()
+print("-- Attack Parameters: ")
+print(" %s epsilon: "%chr(128296),EPSILON)
+print(" %s alpha  : "%chr(128296),ALPHA)
+print(" %s iters  : "%chr(128296),ITERS)
+print()
 
 def pgd_attack(model, images, labels, device='cpu', eps=4/255, alpha=0.01, iters=7):
     images = images.to(device)
@@ -164,16 +152,22 @@ def cross_entropy(input_, target, reduction='elementwise_mean'):
 
 
 if __name__ == '__main__':
+    start_time = time.strftime("%m%d_%H%M", time.localtime())
 
     # create train log save folder
     os.makedirs('%s/%s' % (LOG_DIR, ARCH), exist_ok=True)
 
     # init Tensorborad SummaryWriter
-    writer = SummaryWriter('%s/%s' % (LOG_DIR, ARCH))
+    writer = SummaryWriter('%s/%s-%s' % (LOG_DIR, ARCH, start_time))
 
     # ----------------------------------------
     #   Load dataset
     # ----------------------------------------
+    DATA_TRANSFORM = {
+        'train': transforms.Compose([transforms.Resize(224), transforms.ToTensor()]),
+        'valid': transforms.Compose([transforms.Resize(224), transforms.ToTensor()]),
+        'test': transforms.Compose([transforms.Resize(224), transforms.ToTensor()])
+    }
     train_set = datasets.ImageFolder(os.path.join(DATASET_DIR, 'train'),
                                      transform=DATA_TRANSFORM['train'])
     valid_set = datasets.ImageFolder(os.path.join(DATASET_DIR, 'valid'),
@@ -187,29 +181,29 @@ if __name__ == '__main__':
     test_loader = data.DataLoader(test_set, batch_size=BATCH_SIZE,
                                   shuffle=False, num_workers=NUM_WORKERS)
     num_class = len(train_set.classes)
-    print('%s Load \033[0;32;40m%d\033[0m classes dataset' % (chr(128229),num_class))
+    print('%s Load \033[0;32;40m%d\033[0m classes dataset' %
+          (chr(128229), num_class))
 
-    class_list = train_set.class_to_idx
-    cla_dict = dict((val, key) for key, val in class_list.items())
-    json_str = json.dumps(cla_dict, indent=4)
-    with open(os.path.join(LOG_DIR,'class_indices.json'), 'w') as json_file:
-        json_file.write(json_str)
+    # save class json file in log_dir
+    with open(os.path.join(LOG_DIR, 'class_indices.json'), 'w') as f:
+        f.write(json.dumps(
+            {value: key for key, value in train_set.class_to_idx.items()},
+            indent=4
+        ))
 
     # ----------------------------------------
     #   Load model and fine tune
     # ----------------------------------------
-    print('%s Try to load model \033[0;32;40m%s\033[0m ...' % (chr(128229),ARCH))
-    # model: nn.Module = Models.model_zoo[ARCH]()
-    model=resnet34(pretrained=True)
-    model.fc = nn.Linear(model.fc.in_features, num_class)
+    print('%s Try to load model \033[0;32;40m%s\033[0m ...' % (
+        chr(128229), ARCH))
+    model: nn.Module = Models.model_zoo[ARCH]()
+    model.linear = nn.Linear(model.linear.in_features, num_class)
     model.to(DEVICE)
 
-    if IS_ADVERSARIAL_TRAINING:
-        model_attack: attack.BaseAttack = attack.GetAttackByName(
-            ATTACK_METHOD)(model, DEVICE, ATTACK_PARAMS)
-        print(model_attack.epsilon)
-        print(model_attack.alpha)
-        print(model_attack.num_steps)
+    optimizer = optim.Adam(model.parameters(), lr=LR)
+    loss_function = nn.CrossEntropyLoss()
+    # loss_function = nn.MSELoss()
+    loss_function.to(DEVICE)
 
     # ----------------------------------------
     #   tensorboard :   Add model graph
@@ -227,11 +221,6 @@ if __name__ == '__main__':
             print(summary(model, input_tensor_sample.size(),
                   device=DEVICE.split(':')[0]))
 
-    loss_function = nn.CrossEntropyLoss()
-    # loss_function = nn.MSELoss()
-    loss_function.to(DEVICE)
-    optimizer = optim.Adam(model.parameters(), lr=LR)
-
     # ----------------------------------------
     #   set train random seed
     # ----------------------------------------
@@ -243,7 +232,8 @@ if __name__ == '__main__':
     # ----------------------------------------
     #   Train model
     # ----------------------------------------
-    print('train model in device: \033[0;32;40m%s\033[0m ' % DEVICE)
+    print('%s Train model in device: \033[0;32;40m%s\033[0m ' % (
+        chr(128640), DEVICE))
     os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
     train_log = []
     best_model_state_dict = copy.deepcopy(model.state_dict())
@@ -266,30 +256,21 @@ if __name__ == '__main__':
             batch = images.size(0)
             num_data += batch
 
-            is_mixup = True
-            if IS_ADVERSARIAL_TRAINING and is_mixup:
-                # images = model_attack.att ack(images, labels)
-                images = pgd_attack(
-                    model, images, labels, device=DEVICE, eps=4/255, alpha=0.01, iters=7)
-                # Mixup
-                alpha_ = 9999.0
-                lam = np.random.beta(alpha_, alpha_)
+            adv_images = pgd_attack(model, images, labels)
 
-                index = torch.randperm(images.size(0)).cuda()
-                inputs: Tensor = lam*images.cuda() + (1-lam) * \
-                    images[index, :].cuda()
-                labels_a, labels_b = labels, labels[index]
-                labels_a: Tensor = one_hot(labels_a, 10)
-                labels_b: Tensor = one_hot(labels_b, 10)
+            alpha = 9999.0
+            lam = np.random.beta(alpha, alpha)
+            index = torch.randperm(adv_images.size(0)).cuda()
+            inputs = lam*adv_images.cuda() + (1-lam)*images[index, :].cuda()
+            labels_a, labels_b = labels, labels[index]
+            labels_a = one_hot(labels_a, 10)
+            labels_b = one_hot(labels_b, 10)
 
-                output: Tensor = model(inputs.to(DEVICE))
-                _, pred = torch.max(output, 1)
-                loss: Tensor = lam * cross_entropy(output, smooth_one_hot(labels_a, 10, 0.3).to(DEVICE))+(
-                    1 - lam) * cross_entropy(output, smooth_one_hot(labels_b, 10, 0.3).to(DEVICE))
-            else:
-                output: Tensor = model(images)
-                _, pred = torch.max(output, 1)
-                loss: Tensor = loss_function(output, labels)
+            output: Tensor = model(adv_images.to(DEVICE))
+            _, pred = torch.max(output, 1)
+            # loss: Tensor = loss_function(output, labels)
+            loss = lam * cross_entropy(output, smooth_one_hot(labels_a, 10, 0.3).to(DEVICE))+(
+                1 - lam) * cross_entropy(output, smooth_one_hot(labels_b, 10, 0.3).to(DEVICE))
 
             loss.backward()
             optimizer.step()
@@ -300,10 +281,9 @@ if __name__ == '__main__':
             running_loss += epoch_loss
             running__acc += epoch__acc
 
-            if IS_ADVERSARIAL_TRAINING and is_mixup:
-                pbar.set_description('loss:%.6f acc:%.6f lam:%.6f' %(epoch_loss / batch, epoch__acc / batch, lam))
-            else:
-                pbar.set_description('loss:%.6f acc:%.6f' %(epoch_loss / batch, epoch__acc / batch))
+            pbar.set_description('loss:%.6f acc:%.6f' %
+                                 (epoch_loss / batch, epoch__acc / batch))
+
         train_loss = running_loss / num_data
         train_acc = running__acc / num_data
 
@@ -321,25 +301,26 @@ if __name__ == '__main__':
 
                 output: Tensor = model(images)
                 _, pred = torch.max(output, 1)
-                # loss: Tensor = loss_function(output, labels)
+                loss: Tensor = loss_function(output, labels)
 
-                # epoch_loss = loss.item()
+                epoch_loss = loss.item()
                 epoch__acc = torch.sum(pred == labels).item()
                 running_loss += epoch_loss
                 running__acc += epoch__acc
 
-                # pbar.set_description('loss:%.6f acc:%.6f' %(epoch_loss / batch, epoch__acc / batch))
-                pbar.set_description('acc:%.6f' % (epoch__acc / batch))
-            # valid_loss = running_loss / num_data
+                pbar.set_description('loss:%.6f acc:%.6f' % (
+                    epoch_loss / batch, epoch__acc / batch))
+                # pbar.set_description('acc:%.6f' % (epoch__acc / batch))
+            valid_loss = running_loss / num_data
             valid_acc = running__acc / num_data
 
         print('Train Loss:%f Accuracy:%f' % (train_loss, train_acc))
-        print('Valid Accuracy:%f' % (valid_acc))
-        # print('Valid Loss:%f Accuracy:%f' % (valid_loss, valid_acc))
+        # print('Valid Accuracy:%f' % (valid_acc))
+        print('Valid Loss:%f Accuracy:%f' % (valid_loss, valid_acc))
 
         writer.add_scalar('Train/Loss', train_loss, global_step=epoch)
         writer.add_scalar('Train/Accuracy', train_acc, global_step=epoch)
-        # writer.add_scalar('Valid/Loss', valid_loss, global_step=epoch)
+        writer.add_scalar('Valid/Loss', valid_loss, global_step=epoch)
         writer.add_scalar('Valid/Accuracy', valid_acc, global_step=epoch)
 
         if valid_acc > best_valid_acc:
@@ -348,14 +329,20 @@ if __name__ == '__main__':
         torch.save(model.state_dict(), os.path.join(
             MODEL_SAVE_DIR, '%s.pt' % ARCH))
 
-        train_log.append([epoch, train_loss, train_acc,
-                          #  valid_loss,
-                          valid_acc])
+        train_log.append([
+            epoch,
+            train_loss, train_acc,
+            valid_loss, valid_acc
+        ])
+
+    # -----------------------------------
+    #   Finish training
+    # -----------------------------------
 
     # save the best model
     model.load_state_dict(best_model_state_dict)
     torch.save(model.state_dict(), os.path.join(
-    MODEL_SAVE_DIR, '%s-best.pt' % ARCH))
+        MODEL_SAVE_DIR, '%s-best.pt' % ARCH))
 
     # ----------------------------------------
     #   Test model
@@ -393,17 +380,16 @@ if __name__ == '__main__':
     hparam_dict = {'batch size': BATCH_SIZE, 'lr': LR}
     metric_dict = {
         'train loss': train_loss, 'train accuracy': train_acc,
-        # 'valid loss': valid_loss,
+        'valid loss': valid_loss,
         'valid accuracy': valid_acc,
         'test accuracy': test_acc
     }
-    writer.add_hparams(hparam_dict, metric_dict)
+    # writer.add_hparams(hparam_dict, metric_dict)
     writer.close()
 
     os.makedirs('logs', exist_ok=True)
     import time
-    finished_time = time.strftime("%m%d_%H%M", time.localtime())
-    with open(os.path.join(LOG_DIR, '%s-%s.txt' % (ARCH, finished_time)), 'w') as f:
+    with open(os.path.join(LOG_DIR, '%s-%s.txt' % (ARCH, start_time)), 'w') as f:
         f.write('bacth size =%d\n' % BATCH_SIZE)
         f.write('lr         =%f\n' % LR)
         f.write('train epoch=%d\n' % epoch)

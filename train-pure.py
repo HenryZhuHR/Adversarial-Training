@@ -1,6 +1,6 @@
 import os
 import copy
-from torchvision.models.resnet import resnet34
+import time
 import tqdm
 import json
 import argparse
@@ -16,7 +16,7 @@ from torchvision import datasets
 from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
 
-from modules import attack
+# from modules import attack
 from modules import models as Models
 
 # --------------------------------------------------------
@@ -43,6 +43,7 @@ parser.add_argument('--logdir', type=str, default='server',
                     help='train log save folder')
 parser.add_argument('--model_summary', action='store_true',
                     help='if print model summary')
+
 args = parser.parse_args()
 
 # Parse Args
@@ -59,6 +60,8 @@ MODEL_SAVE_DIR: str = args.model_save_dir  # 'checkpoints'
 MODEL_SAVE_NAME: str = ARCH if args.model_save_name == None else args.model_save_name  # 'NONE'/ARCH
 LOG_DIR: str = args.logdir    # 'where tensorboard data save (runs)'
 IS_MODEL_SUMMARY: bool = args.model_summary
+
+
 
 
 def pgd_attack(model, images, labels, device='cpu', eps=4/255, alpha=0.01, iters=7):
@@ -139,23 +142,21 @@ def cross_entropy(input_, target, reduction='elementwise_mean'):
 
 
 if __name__ == '__main__':
+    start_time=time.strftime("%m%d_%H%M",time.localtime())
 
     # create train log save folder
     os.makedirs('%s/%s' % (LOG_DIR, ARCH), exist_ok=True)
 
     # init Tensorborad SummaryWriter
-    writer = SummaryWriter('%s/%s' % (LOG_DIR, ARCH))
+    writer = SummaryWriter('%s/%s-%s' % (LOG_DIR, ARCH,start_time))
 
     # ----------------------------------------
     #   Load dataset
     # ----------------------------------------
     DATA_TRANSFORM = {
-        'train': transforms.Compose([transforms.Resize(224),
-                                     transforms.ToTensor()]),
-        'valid': transforms.Compose([transforms.Resize(256), transforms.CenterCrop(224),
-                                     transforms.ToTensor()]),
-        'test': transforms.Compose([transforms.Resize(224),
-                                    transforms.ToTensor()])
+        'train': transforms.Compose([transforms.Resize(224), transforms.ToTensor()]),
+        'valid': transforms.Compose([transforms.Resize(224), transforms.ToTensor()]),
+        'test': transforms.Compose([transforms.Resize(224), transforms.ToTensor()])
     }
     train_set = datasets.ImageFolder(os.path.join(DATASET_DIR, 'train'),
                                      transform=DATA_TRANSFORM['train'])
@@ -176,7 +177,7 @@ if __name__ == '__main__':
     # save class json file in log_dir
     with open(os.path.join(LOG_DIR, 'class_indices.json'), 'w') as f:
         f.write(json.dumps(
-            {(value, key) for key, value in train_set.class_to_idx.items()},
+            {value: key for key, value in train_set.class_to_idx.items()},
             indent=4
         ))
 
@@ -186,13 +187,13 @@ if __name__ == '__main__':
     print('%s Try to load model \033[0;32;40m%s\033[0m ...' % (
         chr(128229), ARCH))
     model: nn.Module = Models.model_zoo[ARCH]()
-    model.fc = nn.Linear(model.fc.in_features, num_class)
+    model.linear = nn.Linear(model.linear.in_features, num_class)
     model.to(DEVICE)
 
+    optimizer = optim.Adam(model.parameters(), lr=LR)
     loss_function = nn.CrossEntropyLoss()
     # loss_function = nn.MSELoss()
-    loss_function.to(DEVICE)
-    optimizer = optim.Adam(model.parameters(), lr=LR)
+    loss_function.to(DEVICE)    
 
     # ----------------------------------------
     #   tensorboard :   Add model graph
@@ -243,7 +244,7 @@ if __name__ == '__main__':
             images: Tensor = images.to(DEVICE)
             labels: Tensor = labels.to(DEVICE)
             batch = images.size(0)
-            num_data += batch
+            num_data += batch            
 
             output: Tensor = model(images)
             _, pred = torch.max(output, 1)
@@ -251,7 +252,7 @@ if __name__ == '__main__':
 
             loss.backward()
             optimizer.step()
-            optimizer.zero_grad()
+            optimizer.zero_grad()            
 
             epoch_loss = loss.item()
             epoch__acc = torch.sum(pred == labels).item()
@@ -312,6 +313,13 @@ if __name__ == '__main__':
             valid_loss, valid_acc
         ])
 
+
+
+    # -----------------------------------
+    #   Finish training
+    # -----------------------------------
+
+
     # save the best model
     model.load_state_dict(best_model_state_dict)
     torch.save(model.state_dict(), os.path.join(
@@ -357,13 +365,12 @@ if __name__ == '__main__':
         'valid accuracy': valid_acc,
         'test accuracy': test_acc
     }
-    writer.add_hparams(hparam_dict, metric_dict)
+    # writer.add_hparams(hparam_dict, metric_dict)
     writer.close()
 
     os.makedirs('logs', exist_ok=True)
     import time
-    finished_time = time.strftime("%m%d_%H%M", time.localtime())
-    with open(os.path.join(LOG_DIR, '%s-%s.txt' % (ARCH, finished_time)), 'w') as f:
+    with open(os.path.join(LOG_DIR, '%s-%s.txt' % (ARCH, start_time)), 'w') as f:
         f.write('bacth size =%d\n' % BATCH_SIZE)
         f.write('lr         =%f\n' % LR)
         f.write('train epoch=%d\n' % epoch)

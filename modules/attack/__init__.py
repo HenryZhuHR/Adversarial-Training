@@ -3,21 +3,14 @@ import os
 from .utils import *
 
 from .base_attack import BaseAttack
-from .fgsm import FGSM 
+
 from .pgd import PGD 
-from .cw import CW
-from .deepfool import DeepFool
+
 
 
 attack_method_zoo = {
-    'fgsm': FGSM,
-    'FGSM': FGSM,
     'pgd':PGD,
     'PGD':PGD,
-    'cw':CW,
-    'CW':CW,
-    'deepfool':DeepFool,
-    'DeepFool':DeepFool,
 }
 
 
