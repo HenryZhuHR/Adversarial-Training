@@ -69,10 +69,11 @@ ALPHA: float = args.alpha
 ITERS: float = args.iters
 print()
 print("-- Attack Parameters: ")
-print(" %s epsilon: "%chr(128296),EPSILON)
-print(" %s alpha  : "%chr(128296),ALPHA)
-print(" %s iters  : "%chr(128296),ITERS)
+print(" %s epsilon: " % chr(128296), EPSILON)
+print(" %s alpha  : " % chr(128296), ALPHA)
+print(" %s iters  : " % chr(128296), ITERS)
 print()
+
 
 def pgd_attack(model, images, labels, device='cpu', eps=4/255, alpha=0.01, iters=7):
     images = images.to(device)
@@ -158,7 +159,7 @@ if __name__ == '__main__':
     os.makedirs('%s/%s' % (LOG_DIR, ARCH), exist_ok=True)
 
     # init Tensorborad SummaryWriter
-    writer = SummaryWriter('%s/%s-%s' % (LOG_DIR, ARCH, start_time))
+    writer = SummaryWriter('%s/%s-%s_%s_%s' % (LOG_DIR, ARCH, EPSILON,ALPHA,ITERS))
 
     # ----------------------------------------
     #   Load dataset
@@ -256,7 +257,8 @@ if __name__ == '__main__':
             batch = images.size(0)
             num_data += batch
 
-            adv_images = pgd_attack(model, images, labels)
+            adv_images = pgd_attack(model, images, labels, device=DEVICE,
+                                    eps=EPSILON, alpha=ALPHA, iters=ITERS)
 
             alpha = 9999.0
             lam = np.random.beta(alpha, alpha)
@@ -327,7 +329,7 @@ if __name__ == '__main__':
             best_model_state_dict = copy.deepcopy(model.state_dict())
             best_valid_acc = valid_acc
         torch.save(model.state_dict(), os.path.join(
-            MODEL_SAVE_DIR, '%s.pt' % ARCH))
+            MODEL_SAVE_DIR, '%s-robust.pt' % MODEL_SAVE_NAME))
 
         train_log.append([
             epoch,
@@ -342,7 +344,7 @@ if __name__ == '__main__':
     # save the best model
     model.load_state_dict(best_model_state_dict)
     torch.save(model.state_dict(), os.path.join(
-        MODEL_SAVE_DIR, '%s-best.pt' % ARCH))
+        MODEL_SAVE_DIR, '%s-best.pt' % MODEL_SAVE_NAME))
 
     # ----------------------------------------
     #   Test model

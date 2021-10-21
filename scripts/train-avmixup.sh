@@ -1,12 +1,15 @@
 rm -rf server
 
-for NUM_STEPS in 5 10
+BATCH_SIZE=128
+EPOCHS=100
+
+for NUM_STEPS in 5
 do 
     python3 train-pure.py \
         --arch resnet34 \
         --device cuda:0 \
-        --batch_size 256 \
-        --max_epoch 50 \
+        --batch_size ${BATCH_SIZE} \
+        --max_epoch ${EPOCHS} \
         --lr 1e-4 \
         --num_worker 8 \
         --seed 100 \
@@ -25,8 +28,8 @@ do
         python3 train-adv.py \
             --arch resnet34 \
             --device cuda:0 \
-            --batch_size 256 \
-            --max_epoch 50 \
+            --batch_size ${BATCH_SIZE} \
+            --max_epoch ${EPOCHS} \
             --lr 1e-4 \
             --num_worker 8 \
             --seed 100 \
