@@ -1,13 +1,13 @@
 rm -rf server
 
 BATCH_SIZE=128
-EPOCHS=100
+EPOCHS=60
 
-for NUM_STEPS in 5
+for NUM_STEPS in 1
 do 
     python3 train-pure.py \
         --arch resnet34 \
-        --device cuda:0 \
+        --device cuda:1 \
         --batch_size ${BATCH_SIZE} \
         --max_epoch ${EPOCHS} \
         --lr 1e-4 \
@@ -19,15 +19,15 @@ do
         --logdir server/runs
 done
 
-for NUM_STEPS in 5 10 20 40
-do 
-    for EPSILON in 1 2 4 8 16 32
-    do
-        for ALPHA in 0.01 0.02 0.03 0.04 0.05 0.06
-        do
-        python3 train-adv.py \
+for ALPHA in 0.03 0.01 0.05
+do
+	for NUM_STEPS in 5 10 20 40
+	do
+		for EPSILON in 2 4 8 16
+		do
+		python3 train-adv.py \
             --arch resnet34 \
-            --device cuda:0 \
+            --device cuda:1 \
             --batch_size ${BATCH_SIZE} \
             --max_epoch ${EPOCHS} \
             --lr 1e-4 \
