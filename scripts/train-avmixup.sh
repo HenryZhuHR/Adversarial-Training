@@ -1,7 +1,7 @@
 rm -rf server
 
 BATCH_SIZE=128
-EPOCHS=60
+EPOCHS=100
 
 for NUM_STEPS in 1
 do 
