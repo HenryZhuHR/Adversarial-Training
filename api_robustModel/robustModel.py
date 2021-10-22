@@ -12,6 +12,18 @@ with open(os.path.join(os.path.split(os.path.realpath(__file__))[0],'models', 'c
     CLASS_INDICES=list(dict(json.load(f)).values())
 
 class RobustResnet34():
+    """Robust ResNet-34 Model Encapsulation.
+
+    Attributes:
+        device: A string to indicating model inference device, such as cpu, cuda or cuda:0.
+        num_class: An integer count of class.
+        model: A torch.nn.Module.
+
+    Example:
+        >>> model = RobustResnet34(\
+            model_weight_path='<your_model_weight_path>',\
+            device=DEVICE)
+    """
     def __init__(self,
                  model_weight_path=DEFAULT_MODEL_PATH,
                  device='cpu'  # default device is cpu
@@ -29,9 +41,9 @@ class RobustResnet34():
         self.model.to(self.device)
 
     def inference(self, x: Tensor) -> Tensor:
-        '''
+        """
             - x: Tensor [1,3,224,224]
-        '''
+        """
         if (x.dim())==3:
             x=x.unsqueeze(0)
         x = x.to(self.device)
@@ -43,10 +55,10 @@ class RobustResnet34():
         return x
 
     def top_k(self, x: Tensor, k: int = 5):
-        '''
+        """
             - x: Tensor [1,3,224,224]
-            - k: 
-        '''
+            - k: sort tensor and select top-k
+        """
         values,indices=torch.topk(self.inference(x),k,dim=0)
         class_name=[]
         for i in indices.tolist():
