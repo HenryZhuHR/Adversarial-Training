@@ -12,7 +12,7 @@ ssh zhr@192.168.1.161 -A
 
 # TensorBoard
 ```bash
-tensorboard --logdir . --host 192.168.1.161
+tensorboard --logdir ./server/runs --host 192.168.1.161
 ```
 
 # Update files
@@ -32,4 +32,5 @@ scp -r gc10_none_mask_divided zhr@192.168.1.161:~/datasets
 server
 ```bash
 scp -r zhr@192.168.1.161:~/project/Adversarial-Training/server C:/Users/henryzhu/Projects/Adversarial-Training
+scp -r zhr@192.168.1.161:~/project/Adversarial-Training/server E:/Projects/Adversarial-Training
 ```

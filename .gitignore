@@ -2,3 +2,6 @@ Adversarial-vertex-mixup-pytorch
 
 # python
 *.pyc
+
+# big files
+server
