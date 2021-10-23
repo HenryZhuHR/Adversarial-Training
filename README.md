@@ -1,5 +1,21 @@
 # Adversarial-Training
 
+
+# Github
+✅ update
+📝 new article
+🚀 deploy
+🙈 ignore 
+⚡ fix problem
+⚡ fix conflict
+🛠️ hexo scripts
+
+⚙️ Added ( 新加入的需求 )
+🛠️ Fixed ( 修复 bug )
+📝 Changed ( 完成的任务 )
+📤 Updated ( 完成的任务，或者由于第三方模块变化而做的变化 )
+
+
 # Train
 ```bash
 bash scripts/train-avmixup.sh
@@ -19,22 +35,22 @@ tensorboard --logdir ./server/runs --host 192.168.1.161
 project
 ```bash
 scp -r  C:/Users/henryzhu/Projects/Adversarial-Training zhr@192.168.1.161:~/project 
-scp -r  E:/Projects/Adversarial-Training zhr@192.168.1.161:~/project 
+scp -r  ../Adversarial-Training zhr@192.168.1.161:~/project 
 
 scp api_robustModel/models/resnet34.pt ubuntu@192.168.1.161:~/Robust_AI_2021/api_robustModel
+
+scp scripts/train-avmixup.sh zhr@192.168.1.161:~/project/Adversarial-Training/scripts
 ```
 
 dataset
 ```bash
 scp -r gc10_none_mask_divided zhr@192.168.1.161:~/datasets 
+scp -r E:/datasets/gc10_none_mask_divided-addcvn zhr@192.168.1.161:~/datasets 
 ```
 
 # Download from remote
 server
 ```bash
-<<<<<<< HEAD
 scp -r zhr@192.168.1.161:~/project/Adversarial-Training/server C:/Users/henryzhu/Projects/Adversarial-Training
-=======
->>>>>>> f9ed4aca33e27478e8f2824767c1d04193fcb3e9
 scp -r zhr@192.168.1.161:~/project/Adversarial-Training/server E:/Projects/Adversarial-Training
 ```

@@ -159,7 +159,7 @@ if __name__ == '__main__':
     os.makedirs('%s/%s' % (LOG_DIR, ARCH), exist_ok=True)
 
     # init Tensorborad SummaryWriter
-    writer = SummaryWriter('%s/%s-%s_%s_%s' % (LOG_DIR, ARCH, int(EPSILON*255),ALPHA,ITERS))
+    writer = SummaryWriter('%s/%s/%s-%s_%s_%s' %(LOG_DIR, ARCH, ARCH,int(EPSILON*255), ALPHA, ITERS))
 
     # ----------------------------------------
     #   Load dataset
@@ -390,8 +390,8 @@ if __name__ == '__main__':
     writer.close()
 
     os.makedirs('logs', exist_ok=True)
-    import time
-    with open(os.path.join(LOG_DIR, '%s-%s.txt' % (ARCH, start_time)), 'w') as f:
+
+    with open(os.path.join('%s/%s/%s-%s_%s_%s/log.txt' %(LOG_DIR, ARCH, ARCH,int(EPSILON*255), ALPHA, ITERS), 'w')) as f:
         f.write('bacth size =%d\n' % BATCH_SIZE)
         f.write('lr         =%f\n' % LR)
         f.write('train epoch=%d\n' % epoch)
