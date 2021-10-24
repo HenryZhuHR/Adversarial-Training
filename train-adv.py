@@ -159,7 +159,7 @@ if __name__ == '__main__':
     os.makedirs('%s/%s' % (LOG_DIR, ARCH), exist_ok=True)
 
     # init Tensorborad SummaryWriter
-<<<<<<< Updated upstream
+
     writer = SummaryWriter('%s/%s/%s-%s_%s_%s' %(LOG_DIR, ARCH, ARCH,int(EPSILON*255), ALPHA, ITERS))
 
     # ----------------------------------------
