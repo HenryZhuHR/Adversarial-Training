@@ -15,6 +15,24 @@
 📝 Changed ( 完成的任务 )
 📤 Updated ( 完成的任务，或者由于第三方模块变化而做的变化 )
 
+# Files
+```bash
+├─api_robustModel
+│  ├─models
+├─modules
+│  ├─attack
+│  ├─dataset
+│  ├─models
+│  └─utils
+├─generate-adv_exp.py   # generate-adv_exp
+├─predict.py            # 
+├─test.py               # test robust model
+├─train-adv.py          # adversarial training by AVMixup
+├─train-pgd-avmixup.py  # adversarial training by AVMixup (old)
+├─train-pure.py         # train without any adversarial method
+├─write_data-table.py   # write test result to data.xlsx file
+└─scripts
+```
 
 # Train
 ```bash
@@ -45,12 +63,15 @@ scp scripts/train-avmixup.sh zhr@192.168.1.161:~/project/Adversarial-Training/sc
 dataset
 ```bash
 scp -r gc10_none_mask_divided zhr@192.168.1.161:~/datasets 
-scp -r E:/datasets/gc10_none_mask_divided-addcvn zhr@192.168.1.161:~/datasets 
+scp -r E:/datasets/gc10_dsets zhr@192.168.1.161:~/datasets 
 ```
 
 # Download from remote
 server
 ```bash
 scp -r zhr@192.168.1.161:~/project/Adversarial-Training/server C:/Users/henryzhu/Projects/Adversarial-Training
-scp -r zhr@192.168.1.161:~/project/Adversarial-Training/server E:/Projects/Adversarial-Training
+scp -r zhr@192.168.1.161:~/project/Adversarial-Training/server E:/Projects/
+
+# xlsx
+scp -r zhr@192.168.1.161:~/project/Adversarial-Training/data-res.xlsx E:/Projects/Adversarial-Training/data--res.xlsx
 ```

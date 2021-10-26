@@ -4,3 +4,6 @@
 
 # big files
 server
+
+# excel
+*.xlsx
