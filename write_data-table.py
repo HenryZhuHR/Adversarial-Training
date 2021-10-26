@@ -23,7 +23,7 @@ DATASET_BASEDIR = 'E:/datasets/gc10_dsets'
 TRANSFORM = transforms.Compose([transforms.Resize(224), transforms.ToTensor()])
 
 if __name__ == '__main__':
-    model_path = 'api_robustModel/models/resnet34-adv-8.pt'
+    model_path = 'api_robustModel/models/resnet34-adv-2.pt'
     model = RobustResnet34(model_weight_path=model_path, device=DEVICE)
 
     # workbook
@@ -48,9 +48,9 @@ if __name__ == '__main__':
 
         # print(class_name,file_name)
         images_file_list = os.listdir(os.path.join(
-            DATASET_BASEDIR, 'pgd_8_255_demo', class_name))
+            DATASET_BASEDIR, 'test224', class_name))
         image_path = os.path.join(
-            DATASET_BASEDIR, 'pgd_8_255_demo', class_name, images_file_list[index])
+            DATASET_BASEDIR, 'test224', class_name, images_file_list[index])
         image: numpy.ndarray = cv2.imread(image_path)
 
         if image.shape[2] != 3:
@@ -67,9 +67,9 @@ if __name__ == '__main__':
 
         # after rebuilt
         images_file_list = os.listdir(os.path.join(
-            DATASET_BASEDIR, 'recon_pgd_8_255_demo', class_name))
+            DATASET_BASEDIR, 'recon_clean_demo', class_name))
         image_path = os.path.join(
-            DATASET_BASEDIR, 'recon_pgd_8_255_demo', class_name, images_file_list[index])
+            DATASET_BASEDIR, 'recon_clean_demo', class_name, images_file_list[index])
         image: numpy.ndarray = cv2.imread(image_path)
         if image.shape[2] != 3:
             image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
@@ -94,4 +94,4 @@ if __name__ == '__main__':
                              increase_str)
         index += 1
 
-    wb.save('./data-res-8.xlsx')
+    wb.save('./data-res-2.xlsx')
