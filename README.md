@@ -62,7 +62,7 @@ scp scripts/train-avmixup.sh zhr@192.168.1.161:~/project/Adversarial-Training/sc
 dataset
 ```bash
 scp -r gc10_none_mask_divided zhr@192.168.1.161:~/datasets 
-scp -r E:/datasets/gc10_dsets zhr@192.168.1.161:~/datasets 
+scp -r E:/datasets/new_dataset zhr@192.168.1.161:~/datasets 
 ```
 
 # Download from remote

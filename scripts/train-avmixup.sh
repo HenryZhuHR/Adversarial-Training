@@ -55,10 +55,42 @@ do
         --num_worker 8 \
         --seed 100 \
         --model_save_dir server/checkpoints \
-        --model_save_name resnet34_adv~lr={${LR}} \
+        --model_save_name resnet34_adv~lr=${LR} \
         --data ~/datasets/gc10_none_mask_divided \
         --logdir server/runs \
         --epsilon 2 \
         --alpha 0.03 \
         --iters 10
 done
+
+python3 train-adv.py \
+    --arch resnet34 \
+    --device cuda:1 \
+    --batch_size 128 \
+    --max_epoch 200 \
+    --lr 1e-4 \
+    --num_worker 8 \
+    --seed 100 \
+    --model_save_dir server-re/checkpoints \
+    --model_save_name adv~lr=1e-4 \
+    --data ~/datasets/new_dataset \
+    --logdir server-re/runs \
+    --epsilon 2 \
+    --alpha 0.03 \
+    --iters 10
+
+python3 train-adv.py \
+    --arch resnet34 \
+    --device cuda:1 \
+    --batch_size 128 \
+    --max_epoch 200 \
+    --lr 1e-4 \
+    --num_worker 8 \
+    --seed 100 \
+    --model_save_dir server-re/checkpoints \
+    --model_save_name adv_re~lr=1e-4 \
+    --data ~/datasets/gc10_none_mask_divided \
+    --logdir server-re/runs \
+    --epsilon 2 \
+    --alpha 0.03 \
+    --iters 10
