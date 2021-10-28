@@ -52,7 +52,6 @@ tensorboard --logdir ./server/runs --host 192.168.1.161
 # Update files
 project
 ```bash
-scp -r  C:/Users/henryzhu/Projects/Adversarial-Training zhr@192.168.1.161:~/project 
 scp -r  ../Adversarial-Training zhr@192.168.1.161:~/project 
 
 scp api_robustModel/models/resnet34.pt ubuntu@192.168.1.161:~/Robust_AI_2021/api_robustModel
