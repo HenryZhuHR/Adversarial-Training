@@ -37,7 +37,7 @@ parser.add_argument('--data', type=str, default='%s/datasets/custom' % os.path.e
                     help='dataset folder')
 # model save argument
 parser.add_argument('--model_save_dir', type=str, default='server/checkpoints')
-parser.add_argument('--model_save_name', type=str, default='default_model',
+parser.add_argument('--model_save_name', type=str,
                     help='using arch name if not given')
 parser.add_argument('--logdir', type=str, default='server',
                     help='train log save folder')
@@ -160,7 +160,7 @@ if __name__ == '__main__':
 
     # init Tensorborad SummaryWriter
 
-    writer = SummaryWriter('%s/%s/%s-%s_%s_%s' %(LOG_DIR, ARCH, ARCH,int(EPSILON*255), ALPHA, ITERS))
+    writer = SummaryWriter('%s/%s/%s' %(LOG_DIR, ARCH,MODEL_SAVE_NAME))
 
     # ----------------------------------------
     #   Load dataset

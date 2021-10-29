@@ -56,6 +56,7 @@ scp -r  ../Adversarial-Training zhr@192.168.1.161:~/project
 
 scp api_robustModel/models/resnet34.pt ubuntu@192.168.1.161:~/Robust_AI_2021/api_robustModel
 
+scp train-adv.py zhr@192.168.1.161:~/project/Adversarial-Training
 scp scripts/train-avmixup.sh zhr@192.168.1.161:~/project/Adversarial-Training/scripts
 ```
 

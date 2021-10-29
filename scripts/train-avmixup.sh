@@ -83,7 +83,7 @@ python3 train-adv.py \
     --arch resnet34 \
     --device cuda:1 \
     --batch_size 128 \
-    --max_epoch 200 \
+    --max_epoch 100 \
     --lr 1e-4 \
     --num_worker 8 \
     --seed 100 \
