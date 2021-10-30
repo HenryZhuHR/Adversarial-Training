@@ -390,7 +390,7 @@ if __name__ == '__main__':
     # writer.add_hparams(hparam_dict, metric_dict)
     writer.close()
 
-    os.makedirs('logs', exist_ok=True)
+    os.makedirs(os.path.join('%s/%s/%s-%s_%s_%s' %(LOG_DIR, ARCH, ARCH,int(EPSILON*255), ALPHA, ITERS), exist_ok=True)
 
     with open(os.path.join('%s/%s/%s-%s_%s_%s/log.txt' %(LOG_DIR, ARCH, ARCH,int(EPSILON*255), ALPHA, ITERS), 'w')) as f:
         f.write('bacth size =%d\n' % BATCH_SIZE)
