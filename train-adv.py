@@ -160,7 +160,7 @@ if __name__ == '__main__':
 
     # init Tensorborad SummaryWriter
 
-    writer = SummaryWriter('%s/%s/%s' %(LOG_DIR, ARCH,MODEL_SAVE_NAME))
+    writer = SummaryWriter('%s/%s/%s' % (LOG_DIR, ARCH, MODEL_SAVE_NAME))
 
     # ----------------------------------------
     #   Load dataset
@@ -234,6 +234,11 @@ if __name__ == '__main__':
     # ----------------------------------------
     #   Train model
     # ----------------------------------------
+    from api_recon.recon import Recon
+    recon = Recon(model_dir='./api_recon/recon_model.pt',
+                  device=DEVICE,
+                  data_form=4,image_num=2000, batch_size=1,)
+
     print('%s Train model in device: \033[0;32;40m%s\033[0m ' % (
         chr(128640), DEVICE))
     os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
@@ -260,20 +265,23 @@ if __name__ == '__main__':
 
             adv_images = pgd_attack(model, images, labels, device=DEVICE,
                                     eps=EPSILON, alpha=ALPHA, iters=ITERS)
+            
+        
 
             alpha = 9999.0
             lam = np.random.beta(alpha, alpha)
             index = torch.randperm(adv_images.size(0)).cuda()
             inputs = lam*adv_images.cuda() + (1-lam)*images[index, :].cuda()
             labels_a, labels_b = labels, labels[index]
-            labels_a = one_hot(labels_a, 10)
-            labels_b = one_hot(labels_b, 10)
+            labels_a = one_hot(labels_a, num_class)
+            labels_b = one_hot(labels_b, num_class)
 
+        
             output: Tensor = model(adv_images.to(DEVICE))
             _, pred = torch.max(output, 1)
             # loss: Tensor = loss_function(output, labels)
-            loss = lam * cross_entropy(output, smooth_one_hot(labels_a, 10, 0.3).to(DEVICE))+(
-                1 - lam) * cross_entropy(output, smooth_one_hot(labels_b, 10, 0.3).to(DEVICE))
+            loss = lam * cross_entropy(output, smooth_one_hot(labels_a, num_class, 0.3).to(DEVICE))+(
+                1 - lam) * cross_entropy(output, smooth_one_hot(labels_b, num_class, 0.3).to(DEVICE))
 
             loss.backward()
             optimizer.step()
@@ -390,9 +398,10 @@ if __name__ == '__main__':
     # writer.add_hparams(hparam_dict, metric_dict)
     writer.close()
 
-    os.makedirs(os.path.join('%s/%s/%s-%s_%s_%s' %(LOG_DIR, ARCH, ARCH,int(EPSILON*255), ALPHA, ITERS), exist_ok=True)
+    os.makedirs(os.path.join('%s/%s/%s-%s_%s_%s' % (LOG_DIR, ARCH,
+                ARCH, int(EPSILON*255), ALPHA, ITERS), exist_ok=True))
 
-    with open(os.path.join('%s/%s/%s-%s_%s_%s/log.txt' %(LOG_DIR, ARCH, ARCH,int(EPSILON*255), ALPHA, ITERS), 'w')) as f:
+    with open(os.path.join('%s/%s/%s-%s_%s_%s/log.txt' % (LOG_DIR, ARCH, ARCH, int(EPSILON*255), ALPHA, ITERS), 'w')) as f:
         f.write('bacth size =%d\n' % BATCH_SIZE)
         f.write('lr         =%f\n' % LR)
         f.write('train epoch=%d\n' % epoch)
