@@ -83,14 +83,14 @@ python3 train-adv.py \
     --arch resnet34 \
     --device cuda:1 \
     --batch_size 32 \
-    --max_epoch 200 \
+    --max_epoch 100 \
     --lr 1e-4 \
     --num_worker 8 \
     --seed 100 \
-    --model_save_dir server-re/checkpoints \
-    --model_save_name adv_reTrain~lr=1e-4 \
+    --model_save_dir server-at_recon/checkpoints \
+    --model_save_name at_recon~lr=1e-4 \
     --data ~/datasets/gc10_none_mask_divided \
-    --logdir server-reAt/runs \
+    --logdir server-at_recon/runs \
     --epsilon 2 \
     --alpha 0.03 \
     --iters 10

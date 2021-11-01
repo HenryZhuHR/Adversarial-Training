@@ -29,7 +29,7 @@ parser.add_argument('--arch', type=str, choices=Models.model_zoo,
 parser.add_argument('--device', type=str, default='cpu')
 parser.add_argument('--batch_size', type=int, default=2)
 parser.add_argument('--num_worker', type=int, default=0)
-parser.add_argument('--max_epoch', type=int, default=100)
+parser.add_argument('--max_epoch', type=int, default=2)
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--seed', type=int,
                     help='random seed set')
@@ -237,7 +237,7 @@ if __name__ == '__main__':
     from api_recon.recon import Recon
     recon = Recon(model_dir='./api_recon/recon_model.pt',
                   device=DEVICE,
-                  data_form=4,image_num=2000, batch_size=1,)
+                  data_form=4, image_num=2000, batch_size=1,)
 
     print('%s Train model in device: \033[0;32;40m%s\033[0m ' % (
         chr(128640), DEVICE))
@@ -257,6 +257,7 @@ if __name__ == '__main__':
         model.train()
         pbar = tqdm.tqdm(train_loader)
         # mini batch
+        is_recon = 0
         for images, labels in pbar:
             images: Tensor = images.to(DEVICE)
             labels: Tensor = labels.to(DEVICE)
@@ -265,18 +266,19 @@ if __name__ == '__main__':
 
             adv_images = pgd_attack(model, images, labels, device=DEVICE,
                                     eps=EPSILON, alpha=ALPHA, iters=ITERS)
-            
-        
+            if is_recon == 0:
+                recon_images = recon.recon(adv_images)
+            is_recon = (is_recon+1) % 2
 
             alpha = 9999.0
             lam = np.random.beta(alpha, alpha)
-            index = torch.randperm(adv_images.size(0)).cuda()
-            inputs = lam*adv_images.cuda() + (1-lam)*images[index, :].cuda()
+            index = torch.randperm(adv_images.size(0)).to(DEVICE)
+            inputs = lam*adv_images.to(DEVICE) + \
+                (1-lam)*images[index, :].to(DEVICE)
             labels_a, labels_b = labels, labels[index]
             labels_a = one_hot(labels_a, num_class)
             labels_b = one_hot(labels_b, num_class)
 
-        
             output: Tensor = model(adv_images.to(DEVICE))
             _, pred = torch.max(output, 1)
             # loss: Tensor = loss_function(output, labels)
@@ -292,8 +294,8 @@ if __name__ == '__main__':
             running_loss += epoch_loss
             running__acc += epoch__acc
 
-            pbar.set_description('loss:%.6f acc:%.6f' %
-                                 (epoch_loss / batch, epoch__acc / batch))
+            pbar.set_description('loss:%.6f acc:%.6f is_recon=%d' %
+                                 (epoch_loss / batch, epoch__acc / batch,is_recon))
 
         train_loss = running_loss / num_data
         train_acc = running__acc / num_data
