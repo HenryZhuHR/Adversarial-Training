@@ -57,16 +57,17 @@ def test_dataset(
 
 if __name__ == '__main__':
     model_names = {
-        'resnet34': 'pure',
-        'resnet34-adv-2': 'adv_train-2/255',
-        'resnet34-adv-8': 'adv_train-8/255',
-        'adv_re~lr=1e-4-best': 'adv_re~lr=1e-4-best'
+        # 'resnet34': 'pure',
+        # 'resnet34-adv-2': 'adv_train-2/255',
+        # 'resnet34-adv-8': 'adv_train-8/255',
+        # 'adv_re~lr=1e-4-best': 'adv_re~lr=1e-4-best',
+        'at_recon~lr=1e-4-best': 'at_recon~lr=1e-4-best',
     }
     datasets = {
         'test224': 'test',
         'pgd_8_255_demo': 'pgd=8/255',
         'recon_pgd_8_255_demo': 'recon-pgd=8/255',
-        'recon_clean_demo': 'recon-clean'
+        'recon_clean_demo': 'recon-clean',
     }
 
     for model_name in model_names.keys():

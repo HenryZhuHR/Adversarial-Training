@@ -70,7 +70,7 @@ scp -r E:/datasets/new_dataset zhr@192.168.1.161:~/datasets
 server
 ```bash
 scp -r zhr@192.168.1.161:~/project/Adversarial-Training/server C:/Users/henryzhu/Projects/Adversarial-Training
-scp -r zhr@192.168.1.161:~/project/Adversarial-Training/server-re E:/Projects/
+scp -r zhr@192.168.1.161:~/project/Adversarial-Training/server-at_recon E:/Projects/
 
 # xlsx
 scp -r zhr@192.168.1.161:~/project/Adversarial-Training/data-res.xlsx E:/Projects/Adversarial-Training/data--res.xlsx
